@@ -67,7 +67,7 @@ for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do
    file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed removing region code from $file in $iso_name"
    echo_debug "      File offset in image (in 2 KiB blocks): $file_offset"
 
-   field_offset=`echo "$file_offset * 2048 + 35"|bc` || exit_fail "Failed removing region code from $file in $iso_name"
+   field_offset=$(( $file_offset * 2048 + 35 ))
    echo_debug "      Region code field offset in image (in bytes): $field_offset"
 
    dd if=/dev/zero of="../$iso_name" conv=notrunc bs=1 seek=$field_offset count=1 || exit_fail "Failed removing region code from $file in $iso_name"
