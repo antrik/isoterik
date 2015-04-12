@@ -1,0 +1,83 @@
+#!/bin/bash
+DEV=/dev/dvd
+VERBOSE=1
+CLEANUP=1
+
+echo_status()
+{
+   level=$1 && shift
+   if [ "$VERBOSE" -ge $level ]; then
+      echo "$@" >&2
+   fi
+}
+echo_info() { echo_status 1 "$@"; }
+echo_debug() { echo_status 2 "$@"; }
+
+exit_fail()
+{
+   echo "$@" >&2
+   exit 1
+}
+
+echo_info "Checking device access for $DEV ..."
+test -r $DEV || exit_fail "Can't access device $DEV"
+
+echo_info "Reading Volume name of disc in $DEV ..."
+vol_name="`/sbin/blkid -s LABEL -o value $DEV`" || exit_fail "Can't read volume name of disc in $DEV"
+echo_info "Volume name: $vol_name"
+
+echo_info "Extracting decrypted DVD contents from $DEV into temporary directory $vol_name using dvdbackup ..."
+(
+   if [ "$VERBOSE" -ge 1 ]; then
+      dvdbackup_verbose="-p"
+   else
+      exec 2>/dev/null
+   fi
+   dvdbackup -i $DEV -M -n $vol_name $dvdbackup_verbose || exit 1
+) || exit_fail "Failed extracting decrypted DVD contents from $DEV with dvdbackup"
+echo_info
+echo_info "Finished extracting decrypted DVD contents into $vol_name"
+cd "$vol_name" || exit_fail "Failed opening temporary directory $vol_name"
+
+iso_name="$vol_name".iso
+echo_info "Copying raw filesystem from $DEV to $iso_name ..."
+cp $DEV "../$iso_name" || exit_fail "Failed copying raw filesystem from $DEV to $iso_name"
+
+echo_info "Replacing video files in $iso_name with decrypted copies ..."
+for file in */*.VOB; do
+   echo_info "   $file ..."
+
+   expected_size=`stat --printf '%s' $file` || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
+   echo_debug "      Expected size (in bytes): $expected_size"
+
+   file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
+   echo_debug "      Offset in image (in 2 KiB blocks): $file_offset"
+
+   echo_debug "      Copying data ..."
+   dd if=$file of="../$iso_name" conv=notrunc bs=2k seek=$file_offset || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
+done
+
+echo_info "Removing region code from $iso_name ..."
+for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do
+   echo_info "   $file ..."
+
+   expected_size=`stat --printf '%s' $file` || exit_fail "Failed removing region code from $file in $iso_name"
+   echo_debug "      Expected size (in bytes): $expected_size"
+
+   file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed removing region code from $file in $iso_name"
+   echo_debug "      File offset in image (in 2 KiB blocks): $file_offset"
+
+   field_offset=`echo "$file_offset * 2048 + 35"|bc` || exit_fail "Failed removing region code from $file in $iso_name"
+   echo_debug "      Region code field offset in image (in bytes): $field_offset"
+
+   dd if=/dev/zero of="../$iso_name" conv=notrunc bs=1 seek=$field_offset count=1 || exit_fail "Failed removing region code from $file in $iso_name"
+done
+
+if [ "$CLEANUP" -eq 1 ]; then
+   echo_info "Cleaning up temporary directory ..."
+   cd .. && rm -r "$vol_name"
+fi
+
+echo_info
+echo_info "Success: $iso_name should now contain an unencrypted, region-free image."
+echo_info "You can write it to a blank medium using for example \"cdrskin $iso_name\"."
