@@ -40,37 +40,136 @@ echo_info "Finished extracting decrypted DVD contents into $vol_name"
 cd "$vol_name" || exit_fail "Failed opening temporary directory $vol_name"
 
 iso_name="$vol_name".iso
-echo_info "Copying raw filesystem from $DEV to $iso_name ..."
-cp $DEV "../$iso_name" || exit_fail "Failed copying raw filesystem from $DEV to $iso_name"
+echo_info "Compiling worklist for assembling purified image file ..."
 
-echo_info "Replacing video files in $iso_name with decrypted copies ..."
+echo_debug "Compiling decrypted video items:"
 for file in */*.VOB; do
-   echo_info "   $file ..."
+   echo_debug "   $file ..."
 
-   expected_size=`stat --printf '%s' $file` || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
-   echo_debug "      Expected size (in bytes): $expected_size"
+   item_size=`stat --printf '%s' $file` || exit_fail "Failed preparing worklist item for file $file"
+   echo_debug "      Decrypted size: $item_size"
 
-   file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
-   echo_debug "      Offset in image (in 2 KiB blocks): $file_offset"
+   item_offset_blocks=`udffindfile /$file $item_size` || exit_fail "Failed preparing worklist item for file $file"
+   item_offset=$(( $item_offset_blocks * 2048 ))
+   echo_debug "      Offset in image: $item_offset"
 
-   echo_debug "      Copying data ..."
-   dd if=$file of="../$iso_name" conv=notrunc bs=2k seek=$file_offset || exit_fail "Failed replacing file $file in $iso_name with decrypted copy"
+   item_after=$(( $item_offset + $item_size ))
+   echo_debug "      Offset after item: $item_after"
+
+   worklist+=`echo "$item_offset $item_after $file"`$'\n'
 done
 
-echo_info "Removing region code from $iso_name ..."
+echo_debug "Compiling region code removal items:"
 for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do
-   echo_info "   $file ..."
+   echo_debug "   $file ..."
 
-   expected_size=`stat --printf '%s' $file` || exit_fail "Failed removing region code from $file in $iso_name"
+   expected_size=`stat --printf '%s' $file` || exit_fail "Failed preparing worklist item for file $file"
    echo_debug "      Expected size (in bytes): $expected_size"
 
-   file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed removing region code from $file in $iso_name"
+   file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed preparing worklist item for file $file"
    echo_debug "      File offset in image (in 2 KiB blocks): $file_offset"
 
-   field_offset=$(( $file_offset * 2048 + 35 ))
-   echo_debug "      Region code field offset in image (in bytes): $field_offset"
+   item_offset=$(( $file_offset * 2048 + 35 ))
+   echo_debug "      Region code field offset in image (in bytes): $item_offset"
 
-   dd if=/dev/zero of="../$iso_name" conv=notrunc bs=1 seek=$field_offset count=1 || exit_fail "Failed removing region code from $file in $iso_name"
+   item_after=$(( $item_offset + 1 ))
+   echo_debug "      Offset after item: $item_after"
+
+   worklist+=`echo "$item_offset $item_after /dev/zero"`$'\n'
+done
+
+worklist=`echo "$worklist"` # Drop the trailing \n
+echo_debug
+echo_debug "Unordered worklist:"
+echo_debug "$worklist"
+
+worklist=`<<<"$worklist" sort -n`
+echo_debug
+echo_debug "Ordered worklist:"
+echo_debug "$worklist"
+
+# Amend worklist with fragments to copy unaltered from original DVD.
+# (Everything around/between the specially handled fragments we already have in the worklist.)
+#
+# Before every existing worklist entry, we put an extra fragment
+# spanning from the end of the previous entry (or from 0 for the first one) to the beginning of the current entry.
+# Finally, we put another fragment at the very end,
+# spanning from the end of the last existing worklist entry to the end of the disk.
+#
+# All these added fragments use the DVD device as source.
+worklist=`<<<"$worklist" sed '
+   # Initialise loop: put "0" into hold space,
+   # so for the first input line,
+   # 0 is presented as the end of the preceding fragment.
+   #
+   # Pattern space is restored to original state before entering first main loop iteration,
+
+   1{
+      h        # hold_space = pattern_space = "<current_start> <current_end> <source>"
+      s%.*%0%  # pattern_space = "0"
+      x        # pattern_space = "<current_start> <current_end> <source>"; hold_space = "0"
+   }
+
+   # Main loop: for every input line,
+   # first create a fragment spanning from end address of previous fragment (from hold space)
+   # to start address of the one in the input line,
+   # to copy unaltered part from original DVD,
+   # and print it explicitly;
+   # then save the end address of the fragment from the input line to the hold space.
+   #
+   # The pattern space is restored to the original input line afterwards,
+   # and will get printed automatically by sed.
+
+   x                                          # pattern_space = "<previous_end>"; hold_space = "<current_start> <current_end> <source>"
+   G                                          # pattern_space = "<previous_end>\n<current_start> <current_end> <source>"
+   s%\([^\n]*\)\n\([^ ]*\).*%\1 \2 '"$DEV"'%  # pattern_space = "<previous_end> <current_start> <DEV>"
+   /^\([^ ]*\) \1/!p                          # if !(current_start == previous_end) print pattern_space ("<previous_end> <current_start> <DEV>")
+   g                                          # pattern_space = hold_space = "<current_start> <current_end> <source>"
+   s%[^ ]* \([^ ]*\).*%\1%                    # pattern_space = "<current_end>"
+   x                                          # hold_space = "<current_end>"; pattern_space = "<current_start> <current_end> <source> "
+
+   # Final iteration: first print the current input line;
+   # and then generate a fragment spanning from end of the input line
+   # to the end of the disc (indicated by "-"),
+   # to copy remaining part of original DVD.
+   #
+   # That final fragment will be printed automatically by sed.
+
+   ${
+      p                 # print pattern_space ("<current_start> <current_end> <source>")
+      g                 # pattern_space = "<previous_end>"
+      s%$% - '"$DEV"'%  # pattern_space = "<previous_end> - <DEV>"
+   }
+'` || exit_fail "Failed preparing worklist"
+echo_debug
+echo_debug "Complete worklist:"
+echo_debug "$worklist"
+echo_debug
+
+
+echo_info "Assembling purified image file in $iso_name ..."
+exec <<<"$worklist"
+while read start end source; do
+   if [ "$end" != "-" ]; then
+      size=$(( $end - $start ))
+   else
+      size=
+   fi
+
+   if [ "$source" = "$DEV" ]; then
+      if [ -n "$size" ]; then
+         echo_debug "   Copying original data from $source: start=$start end=$end (size=$size) ..."
+         dd if="$source" iflag=skip_bytes,count_bytes skip=$start count=$size status=none | pv -N "   $source" -s $size >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
+      else
+         echo_debug "   Copying original data from $source: start=$start (until end) ..."
+         dd if="$source" iflag=skip_bytes skip=$start status=none | pv -N "   $source" >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start (until end)"
+      fi
+   else
+      echo_debug "   Copying substitute data from $source: start=$start end=$end (size=$size) ..."
+      pv "$source" -N "   $source" -s $size -S >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
+   fi
+
+   test -z "$size" || test "`stat --printf '%s' ../$iso_name`" -eq $end || exit_fail "Failed copying data from $source: $iso_name doesn't have expected size $end after operation"
 done
 
 if [ "$CLEANUP" -eq 1 ]; then
