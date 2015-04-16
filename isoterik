@@ -179,4 +179,4 @@ fi
 
 echo_info
 echo_info "Success: $iso_name should now contain an unencrypted, region-free image."
-echo_info "You can write it to a blank medium using for example \"cdrskin $iso_name\"."
+echo_info "You can write it to a blank medium using for instance \"cdrskin $iso_name\"."
