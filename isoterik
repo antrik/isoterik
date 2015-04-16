@@ -147,7 +147,7 @@ echo_debug "$worklist"
 echo_debug
 
 
-echo_info "Assembling purified image file in $iso_name ..."
+echo_info "Assembling purified image file in $iso_name from decrypted files and unaltered fragments..."
 exec <<<"$worklist"
 while read start end source; do
    if [ "$end" != "-" ]; then
