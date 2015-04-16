@@ -170,6 +170,15 @@ while read start end source; do
    fi
 
    test -z "$size" || test "`stat --printf '%s' ../$iso_name`" -eq $end || exit_fail "Failed copying data from $source: $iso_name doesn't have expected size $end after operation"
+
+   if [ "$CLEANUP" -eq 1 ]; then
+      if [ -n "`<<<\"$source\" grep '^VIDEO_TS/'`" ]; then
+         echo_info "      Deleting no longer needed $source from temporary directory ..."
+         rm "$source"
+      else
+         echo_debug "      [NOT deleting $source]"
+      fi
+   fi
 done
 
 if [ "$CLEANUP" -eq 1 ]; then
