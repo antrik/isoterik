@@ -26,6 +26,9 @@ echo_info "Reading Volume name of disc in $DEV ..."
 vol_name="`/sbin/blkid -s LABEL -o value $DEV`" || exit_fail "Can't read volume name of disc in $DEV"
 echo_info "Volume name: $vol_name"
 
+iso_name="$vol_name".iso
+test ! -e "$iso_name" || exit_fail "Image file $iso_name already exists"
+
 echo_info "Extracting decrypted DVD contents from $DEV into temporary directory $vol_name using dvdbackup ..."
 (
    if [ "$VERBOSE" -ge 1 ]; then
@@ -39,7 +42,6 @@ echo_info
 echo_info "Finished extracting decrypted DVD contents into $vol_name"
 cd "$vol_name" || exit_fail "Failed opening temporary directory $vol_name"
 
-iso_name="$vol_name".iso
 echo_info "Compiling worklist for assembling purified image file ..."
 
 echo_debug "Compiling decrypted video items:"
