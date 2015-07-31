@@ -150,6 +150,13 @@ echo_debug
 
 
 echo_info "Assembling purified image file in $iso_name from decrypted files and unaltered fragments..."
+
+if [ "$VERBOSE" -ge 1 ]; then
+   pv_quiet=
+else
+   pv_quiet="-q"
+fi
+
 exec <<<"$worklist"
 while read start end source; do
    if [ "$end" != "-" ]; then
@@ -161,14 +168,14 @@ while read start end source; do
    if [ "$source" = "$DEV" ]; then
       if [ -n "$size" ]; then
          echo_debug "   Copying original data from $source: start=$start end=$end (size=$size) ..."
-         dd if="$source" iflag=skip_bytes,count_bytes skip=$start count=$size status=none | pv -N "   $source" -s $size >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
+         dd if="$source" iflag=skip_bytes,count_bytes skip=$start count=$size status=none | pv -N "   $source" -s $size $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
       else
          echo_debug "   Copying original data from $source: start=$start (until end) ..."
-         dd if="$source" iflag=skip_bytes skip=$start status=none | pv -N "   $source" >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start (until end)"
+         dd if="$source" iflag=skip_bytes skip=$start status=none | pv -N "   $source" $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start (until end)"
       fi
    else
       echo_debug "   Copying substitute data from $source: start=$start end=$end (size=$size) ..."
-      pv "$source" -N "   $source" -s $size -S >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
+      pv "$source" -N "   $source" -s $size -S $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
    fi
 
    test -z "$size" || test "`stat --printf '%s' ../$iso_name`" -eq $end || exit_fail "Failed copying data from $source: $iso_name doesn't have expected size $end after operation"
