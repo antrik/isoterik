@@ -1,7 +1,21 @@
 #!/bin/bash
+
+
+### Settings ###
+
+# Location of the device file corresponding to the drive containing the DVD
 DEV=/dev/dvd
+
+# 1: display progress on stderr
+# 0: no output (except errors)
+# 2: extra status output (mostly for debugging)
 VERBOSE=1
+
+# 1: clean up temporary files when no longer needed
+# 0: leave in place (mostly for debugging)
 CLEANUP=1
+
+### End of Settings ###
 
 
 echo_status()
