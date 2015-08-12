@@ -76,10 +76,11 @@ you can do is simply invoking `isoterik`. This will attempt to access a video
 DVD through `/dev/dvd` -- on most systems, this is a link pointing to the
 primary DVD drive device. If you need to use a different device, you have to
 edit the actual `isoterik` script, changing the value of the `DVD_DEVICE`
-variable defined near the top of the script.
+variable defined near the top of the script; as well as `dvdfindfile.c` --
+which requires a rebuild/reinstall to become effective...
 
-(Some other setting variables are also available -- most notably to change the
-verbosity of status output.)
+(Some additional setting variables are available in the `isoterik` script --
+most notably to change the verbosity of status output.)
 
 If a video DVD is present, isoterik first reads its "volume label", which is a
 short string uniquely identifying the DVD -- usually a shortened but
