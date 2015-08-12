@@ -75,8 +75,8 @@ The main program currently doesn't accept any command line arguments -- so all
 you can do is simply invoking `isoterik`. This will attempt to access a video
 DVD through `/dev/dvd` -- on most systems, this is a link pointing to the
 primary DVD drive device. If you need to use a different device, you have to
-edit the actual `isoterik` script, changing the value of the `DEV` variable
-defined near the top of the script.
+edit the actual `isoterik` script, changing the value of the `DVD_DEVICE`
+variable defined near the top of the script.
 
 (Some other setting variables are also available -- most notably to change the
 verbosity of status output.)

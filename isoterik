@@ -4,7 +4,7 @@
 ### Settings ###
 
 # Location of the device file corresponding to the drive containing the DVD
-DEV=/dev/dvd
+DVD_DEVICE=/dev/dvd
 
 # 1: display progress on stderr
 # 0: no output (except errors)
@@ -49,17 +49,17 @@ exit_fail()
 # Note: Most code doesn't need explicit comments,
 # because the extensive info, debug, and/or error messages explain most steps quite well.
 
-echo_info "Checking device access for $DEV ..."
-test -r $DEV || exit_fail "Can't access device $DEV"
+echo_info "Checking device access for $DVD_DEVICE ..."
+test -r $DVD_DEVICE || exit_fail "Can't access device $DVD_DEVICE"
 
-echo_info "Reading Volume name of disc in $DEV ..."
-vol_name="`/sbin/blkid -s LABEL -o value $DEV`" || exit_fail "Can't read volume name of disc in $DEV"
+echo_info "Reading Volume name of disc in $DVD_DEVICE ..."
+vol_name="`/sbin/blkid -s LABEL -o value $DVD_DEVICE`" || exit_fail "Can't read volume name of disc in $DVD_DEVICE"
 echo_info "Volume name: $vol_name"
 
 iso_name="$vol_name".iso
 test ! -e "$iso_name" || exit_fail "Image file $iso_name already exists"
 
-echo_info "Extracting decrypted DVD contents from $DEV into temporary directory $vol_name using dvdbackup ..."
+echo_info "Extracting decrypted DVD contents from $DVD_DEVICE into temporary directory $vol_name using dvdbackup ..."
 # dvdbackup doesn't have a "quiet" option -- so we need some trickery to conditionally discard its stderr.
 (
    if [ "$VERBOSE" -ge 1 ]; then
@@ -67,8 +67,8 @@ echo_info "Extracting decrypted DVD contents from $DEV into temporary directory 
    else
       exec 2>/dev/null
    fi
-   dvdbackup -i $DEV -M -n $vol_name $dvdbackup_verbose || exit 1
-) || exit_fail "Failed extracting decrypted DVD contents from $DEV with dvdbackup"
+   dvdbackup -i $DVD_DEVICE -M -n $vol_name $dvdbackup_verbose || exit 1
+) || exit_fail "Failed extracting decrypted DVD contents from $DVD_DEVICE with dvdbackup"
 echo_info
 echo_info "Finished extracting decrypted DVD contents into $vol_name"
 cd "$vol_name" || exit_fail "Failed opening temporary directory $vol_name"
@@ -176,13 +176,13 @@ worklist=`<<<"$worklist" sed '
    # The pattern space is restored to the original input line afterwards,
    # and will get printed automatically by sed.
 
-   x                                          # pattern_space = "<previous_end>"; hold_space = "<current_start> <current_end> <source>"
-   G                                          # pattern_space = "<previous_end>\n<current_start> <current_end> <source>"
-   s%\([^\n]*\)\n\([^ ]*\).*%\1 \2 '"$DEV"'%  # pattern_space = "<previous_end> <current_start> <DEV>"
-   /^\([^ ]*\) \1/!p                          # if !(current_start == previous_end) print pattern_space ("<previous_end> <current_start> <DEV>")
-   g                                          # pattern_space = hold_space = "<current_start> <current_end> <source>"
-   s%[^ ]* \([^ ]*\).*%\1%                    # pattern_space = "<current_end>"
-   x                                          # hold_space = "<current_end>"; pattern_space = "<current_start> <current_end> <source> "
+   x                                                 # pattern_space = "<previous_end>"; hold_space = "<current_start> <current_end> <source>"
+   G                                                 # pattern_space = "<previous_end>\n<current_start> <current_end> <source>"
+   s%\([^\n]*\)\n\([^ ]*\).*%\1 \2 '"$DVD_DEVICE"'%  # pattern_space = "<previous_end> <current_start> <DVD_DEVICE>"
+   /^\([^ ]*\) \1/!p                                 # if !(current_start == previous_end) print pattern_space ("<previous_end> <current_start> <DVD_DEVICE>")
+   g                                                 # pattern_space = hold_space = "<current_start> <current_end> <source>"
+   s%[^ ]* \([^ ]*\).*%\1%                           # pattern_space = "<current_end>"
+   x                                                 # hold_space = "<current_end>"; pattern_space = "<current_start> <current_end> <source> "
 
    # Final iteration: first print the current input line;
    # and then generate a fragment spanning from end of the input line
@@ -192,9 +192,9 @@ worklist=`<<<"$worklist" sed '
    # That final fragment will be printed automatically by sed.
 
    ${
-      p                 # print pattern_space ("<current_start> <current_end> <source>")
-      g                 # pattern_space = "<previous_end>"
-      s%$% - '"$DEV"'%  # pattern_space = "<previous_end> - <DEV>"
+      p                        # print pattern_space ("<current_start> <current_end> <source>")
+      g                        # pattern_space = "<previous_end>"
+      s%$% - '"$DVD_DEVICE"'%  # pattern_space = "<previous_end> - <DVD_DEVICE>"
    }
 '` || exit_fail "Failed preparing worklist"
 echo_debug
@@ -220,7 +220,7 @@ while read start end source; do
       size=
    fi
 
-   if [ "$source" = "$DEV" ]; then
+   if [ "$source" = "$DVD_DEVICE" ]; then
       # Verbatim section.
       #
       # Need to use dd here, so we can skip ahead to the desired position in the source image.
