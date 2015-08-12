@@ -112,7 +112,7 @@ echo_debug "$worklist"
 # Before every existing worklist entry, we put an extra fragment
 # spanning from the end of the previous entry (or from 0 for the first one) to the beginning of the current entry.
 # Finally, we put another fragment at the very end,
-# spanning from the end of the last existing worklist entry to the end of the disk.
+# spanning from the end of the last existing worklist entry to the end of the disc.
 #
 # All these added fragments use the DVD device as source.
 worklist=`<<<"$worklist" sed '
