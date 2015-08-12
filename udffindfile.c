@@ -1,3 +1,20 @@
+/*
+ * Helper program using libdvdread to find the offset (in 2 KiB UDF blocks)
+ * of a file in a DVD UDF/ISO filesystem image.
+ *
+ * The first command line parameter is the name of file in question,
+ * given as an absolute path/name within the DVD filesystem.
+ * (Starting with '/'.)
+ *
+ * If a second parameter is given, it is taken as the expected size of the file.
+ * (Can be given as decimal, or any other format understood by strtol --
+ * including octal when starting with "0" or hex when starting with "0x".)
+ *
+ * If the size of the file determined by libdvdread doesn't match the expected size (if given),
+ * the program errors out with an exit code of 100.
+ *
+ * This program assumes the DVD can be accessed through the device specified in DVD_DEVICE below.
+ */
 #define DVD_DEVICE "/dev/dvd"
 
 
