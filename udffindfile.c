@@ -1,3 +1,6 @@
+#define DVD_DEVICE "/dev/dvd"
+
+
 #include <errno.h>
 #include <error.h>
 #include <stdio.h>
@@ -24,7 +27,7 @@ int main(int argc, char *argv[])
          error(1, errno, "Invalid expected size \"%s\"", argv[2]);
    }
 
-   dvd = DVDOpen("/dev/dvd");
+   dvd = DVDOpen(DVD_DEVICE);
    if (!dvd)
       error(2, errno, "Failed opening DVD");
 
