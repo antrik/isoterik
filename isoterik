@@ -18,6 +18,8 @@ CLEANUP=1
 ### End of Settings ###
 
 
+# Diagnostic helper functions.
+
 echo_status()
 {
    level=$1 && shift
@@ -35,6 +37,18 @@ exit_fail()
 }
 
 
+# Main program.
+#
+# Overall structure:
+# * Extract decrypted video files with dvdbackup
+# * Prepare a worklist
+# * Construct final image piece by piece according to worklist:
+#   from decrypted video files; 0-replacements (for the region code);
+#   and everything else taken verbatim from original disc.
+#
+# Note: Most code doesn't need explicit comments,
+# because the extensive info, debug, and/or error messages explain most steps quite well.
+
 echo_info "Checking device access for $DEV ..."
 test -r $DEV || exit_fail "Can't access device $DEV"
 
@@ -46,6 +60,7 @@ iso_name="$vol_name".iso
 test ! -e "$iso_name" || exit_fail "Image file $iso_name already exists"
 
 echo_info "Extracting decrypted DVD contents from $DEV into temporary directory $vol_name using dvdbackup ..."
+# dvdbackup doesn't have a "quiet" option -- so we need some trickery to conditionally discard its stderr.
 (
    if [ "$VERBOSE" -ge 1 ]; then
       dvdbackup_verbose="-p"
@@ -58,7 +73,30 @@ echo_info
 echo_info "Finished extracting decrypted DVD contents into $vol_name"
 cd "$vol_name" || exit_fail "Failed opening temporary directory $vol_name"
 
+
 echo_info "Compiling worklist for assembling purified image file ..."
+
+# The worklist describes from what sections the final iso image will be assembled.
+# It consists of lines of the form:
+#
+#    <start_offset> <end_offset> <source>
+#
+# The offsets are positions in bytes within the iso image.
+#
+# The end offset is the first byte *after* the end of the section.
+# Instead of a number, the string "-" can be given here,
+# to indicate everything till the end of the original disc.
+#
+# The source can be a regular file (for video files from dvdbackup);
+# /dev/null (for the region code replacement);
+# or the DVD device (for parts of the image copied verbatim).
+#
+# The final worklist consists of consecutive, non-overlapping sections
+# covering the entire size of the image.
+# It is created by first adding the decrypted video sections,
+# and the region code replacement sections (in arbitrary order);
+# then sorting all these substitution sections by offset;
+# and finally filling in the rest of the image with verbatim sections.
 
 echo_debug "Compiling decrypted video items:"
 for file in */*.VOB; do
@@ -78,7 +116,7 @@ for file in */*.VOB; do
 done
 
 echo_debug "Compiling region code removal items:"
-for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do
+for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do # Remove both in main info file and in backup copy.
    echo_debug "   $file ..."
 
    expected_size=`stat --printf '%s' $file` || exit_fail "Failed preparing worklist item for file $file"
@@ -87,10 +125,10 @@ for file in VIDEO_TS/VIDEO_TS.{IFO,BUP}; do
    file_offset=`udffindfile /$file $expected_size` || exit_fail "Failed preparing worklist item for file $file"
    echo_debug "      File offset in image (in 2 KiB blocks): $file_offset"
 
-   item_offset=$(( $file_offset * 2048 + 35 ))
+   item_offset=$(( $file_offset * 2048 + 35 )) # The region code is at offset 35 (0x23) in the info file.
    echo_debug "      Region code field offset in image (in bytes): $item_offset"
 
-   item_after=$(( $item_offset + 1 ))
+   item_after=$(( $item_offset + 1 )) # The region code is just 1 byte.
    echo_debug "      Offset after item: $item_after"
 
    worklist+=`echo "$item_offset $item_after /dev/zero"`$'\n'
@@ -173,6 +211,7 @@ else
    pv_quiet="-q"
 fi
 
+# Process worklist line by line.
 exec <<<"$worklist"
 while read start end source; do
    if [ "$end" != "-" ]; then
@@ -182,6 +221,15 @@ while read start end source; do
    fi
 
    if [ "$source" = "$DEV" ]; then
+      # Verbatim section.
+      #
+      # Need to use dd here, so we can skip ahead to the desired position in the source image.
+      # (Which is the same position as in the final image.)
+      #
+      # pv is used only for progress display in this case.
+      #
+      # Note: We need separate sligtly different handling for the case where we copy till the end of the original disc.
+
       if [ -n "$size" ]; then
          echo_debug "   Copying original data from $source: start=$start end=$end (size=$size) ..."
          dd if="$source" iflag=skip_bytes,count_bytes skip=$start count=$size status=none | pv -N "   $source" -s $size $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
@@ -190,10 +238,20 @@ while read start end source; do
          dd if="$source" iflag=skip_bytes skip=$start status=none | pv -N "   $source" $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start (until end)"
       fi
    else
+      # Replacement section.
+      #
+      # We can let pv do the actual work here (in addition to displaying progress),
+      # as we always read from the beginning of the replacement file/device.
+      #
+      # We still need to limit the size, which pv can do on its own. (-S option.)
+      #
+      # Note: Replacement sections never span till the end of the disc.
+
       echo_debug "   Copying substitute data from $source: start=$start end=$end (size=$size) ..."
       pv "$source" -N "   $source" -s $size -S $pv_quiet >>../"$iso_name" || exit_fail "Failed copying data from $source: start=$start size=$size"
    fi
 
+   # If the section has a known size, check that we indeed copied the expected amount of data to the final image.
    test -z "$size" || test "`stat --printf '%s' ../$iso_name`" -eq $end || exit_fail "Failed copying data from $source: $iso_name doesn't have expected size $end after operation"
 
    if [ "$CLEANUP" -eq 1 ]; then
