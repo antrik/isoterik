@@ -103,48 +103,48 @@ the size of the final image -- in the worst case, up to the maximal size of one
 
 isoterik is still pretty rough around the edges. Possible future improvements:
 
-  * A "proper" build system for the binary, using Autoconf.
+* A "proper" build system for the binary, using Autoconf.
 
-  * Command line options -- most notably for selecting the source device; and
-    for changing verbosity of status messages.
+* Command line options -- most notably for selecting the source device; and
+  for changing verbosity of status messages.
 
-  * Operation could be optimised by storing the decrypted video contents
-    directly to the final image, instead of extracting them to temporary files
-    first. This would avoid the need for the temporary directory (and the
-    temporary extra space usage); and avoiding the extra copy would also speed
-    up the operation considerably.
+* Operation could be optimised by storing the decrypted video contents
+  directly to the final image, instead of extracting them to temporary files
+  first. This would avoid the need for the temporary directory (and the
+  temporary extra space usage); and avoiding the extra copy would also speed
+  up the operation considerably.
 
-    This different mode of operation shouldn't be too hard to implement in the
-    isoterik script itself -- however, it would require extra functionality
-    from the underlying programs: specifically, the ability to extract
-    individual video files.
+  This different mode of operation shouldn't be too hard to implement in the
+  isoterik script itself -- however, it would require extra functionality
+  from the underlying programs: specifically, the ability to extract
+  individual video files.
 
-    (And probably also a more explicit way to get a listing of all video files
-    on the DVD. While `dvdbackup` can print this information, the output
-    doesn't appear suitable for reliable machine parsing...)
+  (And probably also a more explicit way to get a listing of all video files
+  on the DVD. While `dvdbackup` can print this information, the output
+  doesn't appear suitable for reliable machine parsing...)
 
-    There are several possible approaches for tackling this problem:
+  There are several possible approaches for tackling this problem:
 
-      * Use `vobcopy` instead of `dvdbackup`. This is another program doing
-        mostly the same, but with some different functions -- including
-        extraction of individual files. However, I'm reluctant to introduce a
-        dependency on vobcopy, as it seems rather unmaintained, and the code
-        quality is horrible...
+    * Use `vobcopy` instead of `dvdbackup`. This is another program doing
+      mostly the same, but with some different functions -- including
+      extraction of individual files. However, I'm reluctant to introduce a
+      dependency on vobcopy, as it seems rather unmaintained, and the code
+      quality is horrible...
 
-      * Implement additional helper binaries. However, unlike the `udffindfile`
-        functionality, extracting files is a rather complex process, which
-        would require duplicating quite a lot of functionality from dvdbackup.
+    * Implement additional helper binaries. However, unlike the `udffindfile`
+      functionality, extracting files is a rather complex process, which
+      would require duplicating quite a lot of functionality from dvdbackup.
 
-      * Implement the whole thing in C. If we have to implement large parts of
-        the core functionality anyway (rather than relying on existing
-        programs), there is really not much point in using a wrapper script at
-        all...
+    * Implement the whole thing in C. If we have to implement large parts of
+      the core functionality anyway (rather than relying on existing
+      programs), there is really not much point in using a wrapper script at
+      all...
 
-      * Add the required extra functionality to dvdbackup, and use that in our
-        script. This shouldn't be too hard to do -- but it would complicate
-        deployment of isoterik, as it would now rely on a new version of
-        dvdbackup to work. (Unless we keep the old mode of operation in place
-        as a fallback, complicating the script...)
+    * Add the required extra functionality to dvdbackup, and use that in our
+      script. This shouldn't be too hard to do -- but it would complicate
+      deployment of isoterik, as it would now rely on a new version of
+      dvdbackup to work. (Unless we keep the old mode of operation in place
+      as a fallback, complicating the script...)
 
-      * Implement the whole thing within dvdbackup: introducing an optional new
-        mode of operation doing the same as isoterik...
+    * Implement the whole thing within dvdbackup: introducing an optional new
+      mode of operation doing the same as isoterik...
