@@ -136,7 +136,7 @@ isoterik is still pretty rough around the edges. Possible future improvements:
         would require duplicating quite a lot of functionality from dvdbackup.
 
       * Implement the whole thing in C. If we have to implement large parts of
-        the core functionality anyways (rather than relying on existing
+        the core functionality anyway (rather than relying on existing
         programs), there is really not much point in using a wrapper script at
         all...
 
