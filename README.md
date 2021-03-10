@@ -1,4 +1,6 @@
-# Introduction
+# isoterik: a region-code scrubbing, non-remastering DVD cloning tool
+
+## Introduction
 
 isoterik extracts a "purified" `.iso` (UDF) image of a video DVD, devoid of
 region code. (And CSS encryption.)
@@ -26,7 +28,7 @@ actual work; which in turn needs yet another library to deal with CSS, that I
 might not even be allowed to tell you about without risking legal
 repercussions... Yay for copyright legislation.
 
-# Installation
+## Installation
 
 isoterik consists of two components: the main `isoterik` program, which is a
 shell script; and the `udffindfile` helper binary, which wraps a particular
@@ -69,7 +71,7 @@ idea how common this is.)
 Another runtime dependency is `/sbin/blkid`, which should always be present on
 GNU/Linux and similar systems, but might be missing elsewhere.
 
-# Usage
+## Usage
 
 The main program currently doesn't accept any command line arguments -- so all
 you can do is simply invoking `isoterik`. This will attempt to access a video
@@ -97,7 +99,7 @@ are stored does need some temporary extra space during processing, on top of
 the size of the final image -- in the worst case, up to the maximal size of one
 `VOB` file, which is `1 GiB`.
 
-# ToDo
+## ToDo
 
 isoterik is still pretty rough around the edges. Possible future improvements:
 
